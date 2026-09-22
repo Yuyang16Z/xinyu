@@ -22,7 +22,6 @@ let editingId = null;
 let lastSavedEntryId = null;
 let activeAction = null;
 let activeEntryId = null;
-let actionBeforeMood = null;
 let timerId = null;
 let remaining = 0;
 let timerRunning = false;
@@ -50,12 +49,12 @@ function demoEntries() { return [
   { id: 'demo-5', mood: 3, feelings: ['疲惫'], events: ['学业'], note: '事情有点多，决定先做一件。', createdAt: relativeDay(6) }
 ]; }
 function demoActions() { return [
-  { id: 'demo-action-1', entryId: 'demo-1', type: 'breathing', beforeMood: 2, afterMood: 2, feedback: '差不多', endedAt: relativeDay(0) },
-  { id: 'demo-action-2', entryId: 'demo-3', type: 'movement', beforeMood: 4, afterMood: 5, feedback: '轻松了一点', endedAt: relativeDay(2) }
+  { id: 'demo-action-1', entryId: 'demo-1', type: 'breathing', afterMood: 2, feedback: '差不多', endedAt: relativeDay(0) },
+  { id: 'demo-action-2', entryId: 'demo-3', type: 'movement', afterMood: 5, feedback: '轻松了一点', endedAt: relativeDay(2) }
 ]; }
 function currentEntries() { return (demo ? demoEntries() : entries).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); }
 function currentActions() { return demo ? demoActions() : actions; }
-function moodInfo(value) { return MOODS.find(m => m.value === Number(value)) || MOODS[2]; }
+function moodInfo(value) { return MOODS.find(m => m.value === Number(value)) || { value: null, label: '未选心情', face: '·' }; }
 function dateLabel(date, long = false) { return new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: long ? 'long' : undefined, hour: long ? '2-digit' : undefined, minute: long ? '2-digit' : undefined }).format(new Date(date)); }
 
 function moodButtons(container, selected = null) {
@@ -69,8 +68,9 @@ function selectedChips(container) { return [...$(container).querySelectorAll('.c
 function toggleChoice(event) {
   const mood = event.target.closest('[data-mood]');
   if (mood) {
-    mood.parentElement.querySelectorAll('[data-mood]').forEach(el => { const yes = el === mood; el.classList.toggle('selected', yes); el.setAttribute('aria-pressed', yes); });
-    if (mood.parentElement.id === 'mood-options') $('entry-extra').classList.remove('hidden');
+    const wasSelected = mood.classList.contains('selected');
+    mood.parentElement.querySelectorAll('[data-mood]').forEach(el => { const yes = el === mood && !wasSelected; el.classList.toggle('selected', yes); el.setAttribute('aria-pressed', yes); });
+    if (mood.parentElement.id === 'mood-options') { $('entry-extra').classList.remove('hidden'); $('skip-mood').classList.add('hidden'); }
     return;
   }
   const chip = event.target.closest('[data-value]');
@@ -79,15 +79,17 @@ function toggleChoice(event) {
 function resetForm() {
   lastSavedEntryId = null;
   moodButtons('mood-options'); chipButtons('feeling-tags', FEELINGS); chipButtons('event-tags', EVENTS);
-  $('entry-note').value = ''; $('entry-extra').classList.add('hidden'); $('saved-panel').classList.add('hidden'); $('entry-form').classList.remove('hidden');
+  $('entry-note').value = ''; $('entry-extra').classList.add('hidden'); $('skip-mood').classList.remove('hidden'); $('saved-panel').classList.add('hidden'); $('entry-form').classList.remove('hidden');
 }
 function saveEntry(event) {
   event.preventDefault();
   if (demo) { exitDemo(); return; }
-  const mood = selectedMood('mood-options');
-  if (!mood) { $('mood-options').focus(); alert('先选一个最接近的心情就好。'); return; }
+  const mood = selectedMood('mood-options') || null;
   const note = $('entry-note').value.trim();
-  const entry = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), mood, feelings: selectedChips('feeling-tags'), events: selectedChips('event-tags'), note, createdAt: new Date().toISOString() };
+  const feelings = selectedChips('feeling-tags');
+  const events = selectedChips('event-tags');
+  if (!mood && !note && !feelings.length && !events.length) { alert('选一种心情、一个标签，或写一句话就可以保存。'); return; }
+  const entry = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), mood, feelings, events, note, createdAt: new Date().toISOString() };
   const next = [entry, ...entries];
   if (!writeStore(KEYS.entries, next)) return;
   entries = next; lastSavedEntryId = entry.id; $('entry-form').classList.add('hidden'); $('saved-panel').classList.remove('hidden');
@@ -126,9 +128,11 @@ function lastSevenDays() { return Array.from({ length: 7 }, (_, i) => { const d 
 function renderInsights() {
   const list = currentEntries();
   $('trend-chart').innerHTML = lastSevenDays().map(d => {
-    const matches = list.filter(e => dayKey(e.createdAt) === dayKey(d));
+    const dayEntries = list.filter(e => dayKey(e.createdAt) === dayKey(d));
+    const matches = dayEntries.filter(e => MOODS.some(m => m.value === Number(e.mood)));
     const avg = matches.length ? matches.reduce((s, e) => s + Number(e.mood), 0) / matches.length : null;
-    return `<div class="trend-column"><span class="trend-value">${avg === null ? '' : avg.toFixed(1).replace('.0', '')}</span><div class="trend-bar${avg === null ? ' empty' : ''}" style="height:${avg === null ? 5 : Math.round(avg * 30)}px" title="${escapeHTML(dayKey(d))}：${avg === null ? '无记录' : `平均 ${avg.toFixed(1)}`}" role="img" aria-label="${escapeHTML(dayKey(d))}：${avg === null ? '无记录' : `平均 ${avg.toFixed(1)}`}"></div><span class="trend-label">${d.getMonth() + 1}/${d.getDate()}</span></div>`;
+    const description = avg === null ? dayEntries.length ? '未选择心情' : '无记录' : `平均 ${avg.toFixed(1)}`;
+    return `<div class="trend-column"><span class="trend-value">${avg === null ? '' : avg.toFixed(1).replace('.0', '')}</span><div class="trend-bar${avg === null ? ' empty' : ''}" style="height:${avg === null ? 5 : Math.round(avg * 30)}px" title="${escapeHTML(dayKey(d))}：${description}" role="img" aria-label="${escapeHTML(dayKey(d))}：${description}"></div><span class="trend-label">${d.getMonth() + 1}/${d.getDate()}</span></div>`;
   }).join('');
   const counts = Object.fromEntries(EVENTS.map(t => [t, 0]));
   list.forEach(e => (e.events || []).forEach(t => { if (counts[t] !== undefined) counts[t]++; }));
@@ -137,7 +141,7 @@ function renderInsights() {
   const reflection = $('reflection-content');
   if (list.length < 3 || !popular.length) { reflection.innerHTML = '<p>再记录几次，我们可以一起回顾。这里不会猜测你尚未写下的经历。</p>'; return; }
   const [tag, n] = popular[0];
-  const low = list.filter(e => e.mood <= 2);
+  const low = list.filter(e => Number(e.mood) >= 1 && Number(e.mood) <= 2);
   const lowWithTag = low.filter(e => (e.events || []).includes(tag)).length;
   let message = `你有 ${n} 条记录提到了“${tag}”。可以回看这些时刻，留意当时发生了什么。`;
   if (low.length >= 2 && lowWithTag >= 2) message = `最近 ${low.length} 条较低落的记录中，有 ${lowWithTag} 条同时标记了“${tag}”。这只是记录中的关联，可以回看看具体发生了什么。`;
@@ -192,8 +196,12 @@ function openEntry(id) {
 function updateEntry(event) {
   event.preventDefault(); if (demo || !editingId) return;
   const index = entries.findIndex(e => e.id === editingId); if (index < 0) return;
-  const mood = selectedMood('edit-moods'); if (!mood) return;
-  const next = entries.slice(); next[index] = { ...next[index], mood, feelings: selectedChips('edit-feelings'), events: selectedChips('edit-events'), note: $('edit-note').value.trim(), updatedAt: new Date().toISOString() };
+  const mood = selectedMood('edit-moods') || null;
+  const feelings = selectedChips('edit-feelings');
+  const events = selectedChips('edit-events');
+  const note = $('edit-note').value.trim();
+  if (!mood && !note && !feelings.length && !events.length) { alert('请至少留下一个心情、标签或一句话。'); return; }
+  const next = entries.slice(); next[index] = { ...next[index], mood, feelings, events, note, updatedAt: new Date().toISOString() };
   if (!writeStore(KEYS.entries, next)) return;
   entries = next; $('entry-dialog').close(); updateAll();
   if (needsSupport(next[index].note)) $('support-dialog').showModal();
@@ -221,9 +229,9 @@ function toggleTimer() {
   else {
     if (!actionHasStarted) {
       actionStartedAt = new Date().toISOString(); actionHasStarted = true;
-      actionBeforeMood = selectedMood('before-moods') || null;
-      $('action-entry')?.setAttribute('disabled', '');
-      $('before-moods').querySelectorAll('button').forEach(button => button.disabled = true);
+      $('action-link-toggle')?.classList.add('hidden');
+      $('action-link-picker')?.classList.add('hidden');
+      if (!activeEntryId) $('action-link')?.classList.add('hidden');
     }
     lastTick = Date.now(); timerRunning = true; timerId = setInterval(tick, 250);
   }
@@ -231,22 +239,21 @@ function toggleTimer() {
 }
 function openAction(type, entryId = null) {
   if (!CARE[type]) return;
-  stopTimer(); activeAction = type; remaining = CARE[type].duration; actionStartedAt = null; actionHasStarted = false; actionBeforeMood = null;
+  stopTimer(); activeAction = type; remaining = CARE[type].duration; actionStartedAt = null; actionHasStarted = false;
   const allEntries = currentEntries();
   const linkedEntry = allEntries.find(entry => entry.id === entryId);
   activeEntryId = linkedEntry?.id || null;
-  const choices = [...(linkedEntry ? [linkedEntry] : []), ...allEntries.filter(entry => entry.id !== linkedEntry?.id).slice(0, 5)];
-  const context = choices.length ? `<div class="action-context"><label for="action-entry">关联到日记 <span class="optional">可选</span></label><select id="action-entry"><option value="">不关联，仅保存在关怀页</option>${choices.map(entry => `<option value="${escapeHTML(entry.id)}"${entry.id === activeEntryId ? ' selected' : ''}>${escapeHTML(dateLabel(entry.createdAt))} · ${escapeHTML(moodInfo(entry.mood).label)}${entry.note ? ` · ${escapeHTML(entry.note.slice(0, 16))}` : ''}</option>`).join('')}</select><p class="small-muted">选择日记后，可以从那条记录回看这次行动。</p></div>` : '';
-  const before = `<fieldset class="action-rating"><legend>行动前的心情 <span id="before-rating-note" class="optional">${linkedEntry ? '来自这条记录 · 可修改' : '可跳过'}</span></legend><div id="before-moods" class="mood-options compact"></div></fieldset>`;
+  const choices = [...(linkedEntry ? [linkedEntry] : []), ...allEntries.filter(entry => entry.id !== linkedEntry?.id).slice(0, 9)];
+  const context = choices.length ? `<div id="action-link" class="action-link"><span id="action-link-summary">${linkedEntry ? escapeHTML(actionLinkLabel(linkedEntry)) : ''}</span><button id="action-link-toggle" type="button">${linkedEntry ? '更换' : '＋ 关联日记'}</button><div id="action-link-picker" class="hidden"><label class="sr-only" for="action-entry">选择关联日记</label><select id="action-entry"><option value="">不关联日记</option>${choices.map(entry => `<option value="${escapeHTML(entry.id)}"${entry.id === activeEntryId ? ' selected' : ''}>${escapeHTML(dateLabel(entry.createdAt))} · ${escapeHTML(entry.note?.slice(0, 18) || moodInfo(entry.mood).label)}</option>`).join('')}</select></div></div>` : '';
   $('action-title').textContent = CARE[type].title;
   $('action-feedback').classList.add('hidden'); $('after-rating').classList.remove('hidden'); $('feedback-done').classList.add('hidden'); $('feedback-options').classList.remove('hidden');
   $('action-experience').classList.remove('hidden');
   $('action-experience').innerHTML = type === 'breathing'
-    ? `${context}${before}<p class="small-muted">按自己舒服的节奏呼吸，不必勉强跟上动画。</p><div id="breath-orb" class="breath-orb">慢慢呼吸</div><div id="timer-display" class="timer">02:00</div><div class="action-controls"><button id="timer-toggle" class="button primary" type="button">开始</button><button id="timer-end" class="button subtle" type="button">结束行动</button></div>`
-    : `${context}${before}<p class="small-muted">选择舒服的幅度，不舒服时就停下。</p><ol class="steps"><li>缓缓站起，活动肩颈。</li><li>在房间里走几步，或轻轻伸展。</li><li>感觉脚踩在地面上，慢慢回到当下。</li></ol><div id="timer-display" class="timer">03:00</div><div class="action-controls"><button id="timer-toggle" class="button primary" type="button">开始</button><button id="timer-end" class="button subtle" type="button">结束行动</button><button id="swap-action" class="button outline" type="button">现在不方便，换一个</button></div>`;
-  moodButtons('before-moods', linkedEntry?.mood || null);
+    ? `${context}<p class="small-muted">按自己舒服的节奏呼吸，不必勉强跟上动画。</p><div id="breath-orb" class="breath-orb">慢慢呼吸</div><div id="timer-display" class="timer">02:00</div><div class="action-controls"><button id="timer-toggle" class="button primary" type="button">开始</button><button id="timer-end" class="button subtle" type="button">结束行动</button></div>`
+    : `${context}<p class="small-muted">不舒服时就停下。</p><ol class="steps"><li>起身，活动肩颈。</li><li>走几步，或轻轻伸展。</li><li>感觉脚踩在地面上。</li></ol><div id="timer-display" class="timer">03:00</div><div class="action-controls"><button id="timer-toggle" class="button primary" type="button">开始</button><button id="timer-end" class="button subtle" type="button">结束行动</button><button id="swap-action" class="button outline" type="button">换一个</button></div>`;
   $('action-dialog').showModal();
 }
+function actionLinkLabel(entry) { return `已关联 ${dateLabel(entry.createdAt)}${entry.note ? ` · ${entry.note.slice(0, 10)}` : ''}`; }
 function finishAction() {
   stopTimer(); if (!activeAction) return;
   if (!actionHasStarted) { closeAction(); return; }
@@ -257,7 +264,7 @@ function finishAction() {
 function saveFeedback(response) {
   if (!activeAction) return;
   if (!demo) {
-    const next = [{ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), type: activeAction, entryId: activeEntryId, startedAt: actionStartedAt, endedAt: new Date().toISOString(), beforeMood: actionBeforeMood, afterMood: selectedMood('after-moods') || null, feedback: response }, ...actions];
+    const next = [{ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), type: activeAction, entryId: activeEntryId, startedAt: actionStartedAt, endedAt: new Date().toISOString(), afterMood: selectedMood('after-moods') || null, feedback: response }, ...actions];
     if (!writeStore(KEYS.actions, next)) return;
     actions = next;
   }
@@ -266,7 +273,7 @@ function saveFeedback(response) {
   $('feedback-view-entry').classList.toggle('hidden', demo || !activeEntryId);
   updateAll();
 }
-function closeAction() { stopTimer(); activeAction = null; activeEntryId = null; actionBeforeMood = null; actionHasStarted = false; $('action-dialog').close(); }
+function closeAction() { stopTimer(); activeAction = null; activeEntryId = null; actionHasStarted = false; $('action-dialog').close(); }
 
 document.addEventListener('click', event => {
   if (event.target.closest('[data-mood],[data-value]')) toggleChoice(event);
@@ -275,6 +282,7 @@ document.addEventListener('click', event => {
   const action = event.target.closest('[data-action]'); if (action) openAction(action.dataset.action);
   const entryAction = event.target.closest('[data-entry-action]');
   if (entryAction) { const id = editingId; $('entry-dialog').close(); openAction(entryAction.dataset.entryAction, id); }
+  if (event.target.closest('#action-link-toggle')) { $('action-link-picker').classList.toggle('hidden'); }
   if (event.target.closest('#clear-filter')) { filterTag = null; renderJournal(); }
   if (event.target.closest('#timer-toggle')) toggleTimer();
   if (event.target.closest('#timer-end')) finishAction();
@@ -286,15 +294,17 @@ document.addEventListener('change', event => {
   if (event.target.id !== 'action-entry') return;
   activeEntryId = event.target.value || null;
   const entry = currentEntries().find(item => item.id === activeEntryId);
-  moodButtons('before-moods', entry?.mood || null);
-  $('before-rating-note').textContent = entry ? '来自这条记录 · 可修改' : '可跳过';
+  $('action-link-summary').textContent = entry ? actionLinkLabel(entry) : '';
+  $('action-link-toggle').textContent = entry ? '更换' : '＋ 关联日记';
+  $('action-link-picker').classList.add('hidden');
 });
-document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', () => { if (dialog.id === 'action-dialog') { stopTimer(); activeAction = null; activeEntryId = null; actionBeforeMood = null; actionHasStarted = false; } }));
+document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', () => { if (dialog.id === 'action-dialog') { stopTimer(); activeAction = null; activeEntryId = null; actionHasStarted = false; } }));
 $('entry-form').addEventListener('submit', saveEntry);
 $('edit-form').addEventListener('submit', updateEntry);
 $('delete-entry').addEventListener('click', deleteEntry);
 $('settings-button').addEventListener('click', () => $('settings-dialog').showModal());
 $('new-entry').addEventListener('click', () => { if (demo) exitDemo(); resetForm(); go('now'); });
+$('skip-mood').addEventListener('click', () => { $('entry-extra').classList.remove('hidden'); $('skip-mood').classList.add('hidden'); $('entry-note').focus(); });
 $('saved-care').addEventListener('click', () => { const entry = entries.find(item => item.id === lastSavedEntryId); openAction(recommendedAction(entry), entry?.id || null); });
 $('saved-later').addEventListener('click', resetForm);
 $('enter-demo').addEventListener('click', enterDemo);
