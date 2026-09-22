@@ -221,7 +221,7 @@ function exitDemo() { demo = false; sessionStorage.removeItem(KEYS.demo); filter
 
 function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; timerRunning = false; }
 function formatTime(seconds) { return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; }
-function updateTimerUI() { if (!activeAction) return; const el = $('timer-display'); if (el) el.textContent = formatTime(remaining); const orb = $('breath-orb'); if (orb) orb.classList.toggle('running', timerRunning && !reducedMotion); const toggle = $('timer-toggle'); if (toggle) toggle.textContent = timerRunning ? '暂停' : remaining < CARE[activeAction].duration ? '继续' : '开始'; }
+function updateTimerUI() { if (!activeAction) return; const el = $('timer-display'); if (el) el.textContent = formatTime(remaining); const orb = $('breath-orb'); if (orb) { orb.classList.toggle('running', actionHasStarted && !reducedMotion); orb.classList.toggle('paused', actionHasStarted && !timerRunning); } const toggle = $('timer-toggle'); if (toggle) toggle.textContent = timerRunning ? '暂停' : remaining < CARE[activeAction].duration ? '继续' : '开始'; }
 function tick() { const now = Date.now(); const elapsed = Math.floor((now - lastTick) / 1000); if (elapsed < 1) return; lastTick += elapsed * 1000; remaining = Math.max(0, remaining - elapsed); updateTimerUI(); if (remaining === 0) finishAction(); }
 function toggleTimer() {
   if (!activeAction) return;
