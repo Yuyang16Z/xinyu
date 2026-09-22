@@ -5,3 +5,24 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 .insight-card .trend-chart+.small-muted{margin-top:48px}
 :is(button,a,textarea,input):focus-visible{outline:3px solid #88ad8e;outline-offset:3px}
+.entry-care-section{border-top:1px solid var(--line);margin:13px 0 22px;padding-top:21px;text-align:left}
+.entry-care-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.entry-care-heading .eyebrow{margin-bottom:2px}.entry-care-heading h3{margin:0}
+.entry-care-section .small-muted{margin:0}
+.entry-action-row{border:1px solid #e5ece3;background:#f7faf5;border-radius:12px;padding:12px 14px;margin-top:8px;font-size:13px}
+.entry-care-teaser{border-top:1px solid #edf1ea;color:#55745e;font-size:12px;margin-top:12px;padding-top:10px;text-align:left}
+.mood-journey{display:inline-block;border-radius:20px;background:#e8f1e7;color:#345e43;padding:2px 8px;margin-left:5px;font-size:12px}
+.history-date{color:#87938a}.history-entry-link{border:0;background:none;color:var(--green);text-decoration:underline;padding:0 0 0 8px;font-size:12px}
+.action-context{text-align:left;background:#f4f8f2;border:1px solid #e2ebe0;border-radius:13px;padding:13px 15px;margin:9px 0 20px}
+.action-context label{display:block;font-weight:650;font-size:13px;margin-bottom:7px}
+.action-context select{width:100%;border:1px solid #d8e4d7;border-radius:9px;background:white;color:var(--ink);padding:9px 11px;outline:0}
+.action-context .small-muted{margin:6px 0 0}.action-rating{text-align:left;margin:18px 0 24px!important}
+.action-rating legend{margin-bottom:10px}.action-rating .mood-option{min-height:68px}
+.action-modal #action-feedback{text-align:center}.action-modal #after-rating{text-align:left;margin-top:18px!important}
+@media(max-width:520px){.entry-care-heading{align-items:flex-start;flex-direction:column}.entry-care-heading .button{width:100%}.action-rating .mood-option{padding:8px 2px;min-height:65px}}
+.action-modal{max-height:92vh}.action-modal .modal-head{margin-bottom:8px}
+.action-modal .action-context{margin:4px 0 11px;padding:10px 13px}
+.action-modal .action-rating{margin:10px 0 13px!important}
+.action-modal .action-rating .mood-option{min-height:62px}
+.action-modal .steps{margin:9px auto}.action-modal .steps li{padding:2px}
+.action-modal .timer{margin:5px}.action-modal .breath-orb{width:145px;height:145px;margin:20px auto}
