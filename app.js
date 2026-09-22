@@ -25,6 +25,7 @@ let remaining = 0;
 let timerRunning = false;
 let lastTick = 0;
 let actionStartedAt = null;
+let actionHasStarted = false;
 let reducedMotion = localStorage.getItem(KEYS.motion) === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function readStore(key, fallback) {
@@ -86,7 +87,7 @@ function saveEntry(event) {
   if (needsSupport(note)) { $('saved-care').classList.add('hidden'); $('support-dialog').showModal(); }
   else $('saved-care').classList.remove('hidden');
 }
-function needsSupport(text) { return /自杀|自残|结束生命|不想活|伤害自己|伤害我自己|想去死|活不下去/.test(text); }
+function needsSupport(text) { return /(想|要|准备|打算|计划)(自杀|自残|伤害自己|伤害我自己|结束生命|去死)|不想活了|不想活下去|不想再活|活不下去/.test(text); }
 function entryCard(entry) {
   const m = moodInfo(entry.mood);
   const tags = [...(entry.feelings || []), ...(entry.events || [])];
@@ -177,10 +178,10 @@ function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; time
 function formatTime(seconds) { return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; }
 function updateTimerUI() { const el = $('timer-display'); if (el) el.textContent = formatTime(remaining); const orb = $('breath-orb'); if (orb) orb.classList.toggle('running', timerRunning && !reducedMotion); const toggle = $('timer-toggle'); if (toggle) toggle.textContent = timerRunning ? '暂停' : remaining < CARE[activeAction].duration ? '继续' : '开始'; }
 function tick() { const now = Date.now(); const elapsed = Math.floor((now - lastTick) / 1000); if (elapsed < 1) return; lastTick += elapsed * 1000; remaining = Math.max(0, remaining - elapsed); updateTimerUI(); if (remaining === 0) finishAction(); }
-function toggleTimer() { if (!activeAction) return; if (timerRunning) stopTimer(); else { lastTick = Date.now(); timerRunning = true; timerId = setInterval(tick, 250); } updateTimerUI(); }
+function toggleTimer() { if (!activeAction) return; if (timerRunning) stopTimer(); else { if (!actionHasStarted) { actionStartedAt = new Date().toISOString(); actionHasStarted = true; } lastTick = Date.now(); timerRunning = true; timerId = setInterval(tick, 250); } updateTimerUI(); }
 function openAction(type) {
   if (!CARE[type]) return;
-  stopTimer(); activeAction = type; remaining = CARE[type].duration; actionStartedAt = new Date().toISOString();
+  stopTimer(); activeAction = type; remaining = CARE[type].duration; actionStartedAt = null; actionHasStarted = false;
   $('action-title').textContent = CARE[type].title;
   $('action-feedback').classList.add('hidden'); $('feedback-done').classList.add('hidden'); $('feedback-options').classList.remove('hidden');
   $('action-experience').classList.remove('hidden');
@@ -191,6 +192,7 @@ function openAction(type) {
 }
 function finishAction() {
   stopTimer(); if (!activeAction) return;
+  if (!actionHasStarted) { closeAction(); return; }
   $('action-experience').classList.add('hidden'); $('action-feedback').classList.remove('hidden');
   $('feedback-options').innerHTML = ['轻松了一点', '差不多', '更不舒服', '暂时不想回答'].map(v => `<button type="button" data-feedback="${v}">${v}</button>`).join('');
 }
@@ -203,7 +205,7 @@ function saveFeedback(response) {
   }
   $('feedback-options').classList.add('hidden'); $('feedback-done').classList.remove('hidden'); renderCare();
 }
-function closeAction() { stopTimer(); activeAction = null; $('action-dialog').close(); }
+function closeAction() { stopTimer(); activeAction = null; actionHasStarted = false; $('action-dialog').close(); }
 
 document.addEventListener('click', event => {
   if (event.target.closest('[data-mood],[data-value]')) toggleChoice(event);
@@ -217,7 +219,7 @@ document.addEventListener('click', event => {
   const feedback = event.target.closest('[data-feedback]'); if (feedback) saveFeedback(feedback.dataset.feedback);
   if (event.target.closest('.close-dialog')) event.target.closest('dialog').close();
 });
-document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', () => { if (dialog.id === 'action-dialog') stopTimer(); }));
+document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', () => { if (dialog.id === 'action-dialog') { stopTimer(); activeAction = null; actionHasStarted = false; } }));
 $('entry-form').addEventListener('submit', saveEntry);
 $('edit-form').addEventListener('submit', updateEntry);
 $('delete-entry').addEventListener('click', deleteEntry);
