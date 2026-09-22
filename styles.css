@@ -32,3 +32,24 @@
 #action-link-picker{flex-basis:100%;margin-top:6px}
 #action-link-picker select{width:100%;border:1px solid #d8e4d7;border-radius:9px;background:#fbfcfa;color:var(--ink);padding:9px 11px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* 温和的动态反馈：只在进入和操作时出现，不让页面持续晃动。 */
+.button,.mood-option,.chip,.entry-card,.care-card,.side-nav a,.bottom-nav a{transition:background-color .28s ease,border-color .28s ease,color .28s ease,box-shadow .28s ease,transform .28s ease}
+.mood-option .face{transition:transform .32s ease}
+.mood-option.selected .face{transform:scale(1.09)}
+@media(hover:hover){.care-card:hover{transform:translateY(-2px);box-shadow:0 15px 34px rgba(42,63,48,.065)}.button:hover{transform:translateY(-1px)}}
+@keyframes settle-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dialog-in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes backdrop-in{from{opacity:0}to{opacity:1}}
+@keyframes breathe{0%,100%{transform:scale(.94)}50%{transform:scale(1.04)}}
+@media(prefers-reduced-motion:no-preference){
+  body:not(.reduce-motion) .page:not(.hidden) :is(.hero-intro,.page-intro){animation:settle-in .46s ease-out both}
+  body:not(.reduce-motion) .page:not(.hidden) :is(.record-card,.insight-grid,.journal-list,.care-grid){animation:settle-in .52s ease-out .07s both}
+  body:not(.reduce-motion) .page:not(.hidden) .care-preview{animation:settle-in .52s ease-out .13s both}
+  body:not(.reduce-motion) .page:not(.hidden) :is(.week-card,.reflection-card,.action-history){animation:settle-in .52s ease-out .19s both}
+  body:not(.reduce-motion) .page:not(.hidden) .recent-section{animation:settle-in .52s ease-out .24s both}
+  body:not(.reduce-motion) :is(.entry-extra,.saved-panel,#action-feedback):not(.hidden){animation:settle-in .35s ease-out both}
+  body:not(.reduce-motion) dialog[open]{animation:dialog-in .34s ease-out both}
+  body:not(.reduce-motion) dialog[open]::backdrop{animation:backdrop-in .34s ease-out both}
+}
+.reduce-motion *,.reduce-motion *::before,.reduce-motion *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
